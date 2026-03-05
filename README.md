@@ -26,7 +26,7 @@ Web Audio API for generating sound effects
 
 First clone the repository
 
-git clone https://github.com/your-username/memory-matching-game.git
+git clone https://github.com/AbdurRafayHammad/memory-matching-game.git
 
 Then open the project folder and run the file named index.html in any web browser.
 
