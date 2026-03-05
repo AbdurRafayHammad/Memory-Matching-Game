@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Memory Matching Game</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+
+<style>
+*, *::before, *::after {
+box-sizing: border-box;
+margin: 0;
+padding: 0;
+}
+
+:root {
+--bg:#0a0a0f;
+--surface:#12121a;
+--card-back:#1a1a2e;
+--card-border:#2a2a4a;
+--accent:#7c3aed;
+--accent2:#06b6d4;
+--match:#10b981;
+--wrong:#ef4444;
+--text:#e2e8f0;
+--muted:#64748b;
+--glow:rgba(124, 58, 237, 0.4);
+}
+
+body {
+background: var(--bg);
+color: var(--text);
+font-family: 'Syne', sans-serif;
+min-height: 100vh;
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: flex-start;
+padding: 32px 16px;
+overflow-x: hidden;
+}
+
+body::before {
+content: '';
+position: fixed;
+inset: 0;
+background-image:
+linear-gradient(rgba(124,58,237,0.04) 1px, transparent 1px),
+linear-gradient(90deg, rgba(124,58,237,0.04) 1px, transparent 1px);
+background-size: 40px 40px;
+pointer-events: none;
+z-index: 0;
+}
+
+body::after {
+content: '';
+position: fixed;
+top: -200px; left: -200px;
+width: 600px; height: 600px;
+background: radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%);
+pointer-events: none;
+z-index: 0;
+animation: orb 8s ease-in-out infinite alternate;
+}
+
+@keyframes orb {
+from { transform: translate(0, 0); }
+to { transform: translate(calc(100vw - 200px), calc(100vh - 200px)); }
+}
+
+.container {
+position: relative;
+z-index: 1;
+width: 100%;
+max-width: 520px;
+}
+
+header {
+text-align: center;
+margin-bottom: 32px;
+}
+
+.game-title {
+font-size: clamp(28px, 5vw, 44px);
+font-weight: 800;
+letter-spacing: -1px;
+background: linear-gradient(135deg, #fff 0%, var(--accent2) 50%, var(--accent) 100%);
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+background-clip: text;
+margin-bottom: 4px;
+}
+
+.subtitle {
+font-family: 'Space Mono', monospace;
+font-size: 11px;
+color: var(--muted);
+text-transform: uppercase;
+letter-spacing: 3px;
+}
+
+.stats-bar {
+display: flex;
+gap: 12px;
+margin-bottom: 16px;
+justify-content: center;
+flex-wrap: wrap;
+}
+
+.stat-pill {
+background: var(--surface);
+border: 1px solid var(--card-border);
+border-radius: 100px;
+padding: 8px 20px;
+display: flex;
+align-items: center;
+gap: 8px;
+font-family: 'Space Mono', monospace;
+transition: border-color 0.3s;
+}
+
+.stat-pill:hover { border-color: var(--accent); }
+
+.stat-label {
+color: var(--muted);
+font-size: 10px;
+text-transform: uppercase;
+letter-spacing: 1px;
+}
+
+.stat-value {
+color: var(--text);
+font-weight: 700;
+font-size: 16px;
+min-width: 24px;
+text-align: center;
+}
+
+.progress-wrap {
+background: var(--surface);
+border: 1px solid var(--card-border);
+border-radius: 100px;
+height: 6px;
+overflow: hidden;
+margin-bottom: 24px;
+}
+
+#progressBar {
+height: 100%;
+background: linear-gradient(90deg, var(--accent), var(--accent2));
+border-radius: 100px;
+width: 0%;
+transition: width 0.5s ease;
+}
+
+#gameBoard {
+display: grid;
+grid-template-columns: repeat(4, auto);
+gap: 10px;
+justify-content: center;
+margin-bottom: 24px;
+}
+
+.card {
+width: 80px;
+height: 80px;
+cursor: pointer;
+perspective: 600px;
+position: relative;
+}
+
+.card-inner {
+width: 100%;
+height: 100%;
+position: relative;
+transform-style: preserve-3d;
+transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+border-radius: 10px;
+}
+
+.card.flipped .card-inner,
+.card.matched .card-inner {
+transform: rotateY(180deg);
+}
+
+.card-face {
+position: absolute;
+inset: 0;
+border-radius: 10px;
+display: flex;
+align-items: center;
+justify-content: center;
+backface-visibility: hidden;
+-webkit-backface-visibility: hidden;
+}
+
+.card-back-face {
+background: var(--card-back);
+border: 1px solid var(--card-border);
+transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.card-back-face::before {
+content: '?';
+font-family: 'Space Mono', monospace;
+font-weight: 700;
+font-size: 22px;
+color: var(--card-border);
+}
+
+.card:hover:not(.flipped):not(.matched) .card-back-face {
+border-color: var(--accent);
+box-shadow: 0 0 16px var(--glow);
+}
+
+.card-front-face {
+background: var(--surface);
+border: 1px solid var(--card-border);
+font-size: 34px;
+transform: rotateY(180deg);
+}
+
+.card.matched .card-front-face {
+background: rgba(16, 185, 129, 0.12);
+border-color: var(--match);
+box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+animation: matchPulse 0.4s ease;
+}
+
+@keyframes matchPulse {
+0% { transform: rotateY(180deg) scale(1); }
+50% { transform: rotateY(180deg) scale(1.12); }
+100% { transform: rotateY(180deg) scale(1); }
+}
+
+.card.wrong .card-front-face {
+border-color: var(--wrong);
+box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+animation: wrongShake 0.4s ease;
+}
+
+@keyframes wrongShake {
+0%,100% { transform: rotateY(180deg) translateX(0); }
+25% { transform: rotateY(180deg) translateX(-4px); }
+75% { transform: rotateY(180deg) translateX(4px); }
+}
+
+.btn-row {
+display: flex;
+justify-content: center;
+margin-bottom: 24px;
+}
+
+.btn {
+font-family: 'Syne', sans-serif;
+font-weight: 700;
+font-size: 13px;
+letter-spacing: 0.5px;
+padding: 10px 32px;
+border-radius: 8px;
+cursor: pointer;
+border: 1px solid transparent;
+transition: all 0.2s;
+background: var(--accent);
+color: #fff;
+border-color: var(--accent);
+}
+
+.btn:hover {
+background: #6d28d9;
+box-shadow: 0 0 20px var(--glow);
+transform: translateY(-1px);
+}
+
+#winMessage {
+display: none;
+position: fixed;
+inset: 0;
+z-index: 100;
+background: rgba(10,10,15,0.85);
+backdrop-filter: blur(12px);
+align-items: center;
+justify-content: center;
+flex-direction: column;
+text-align: center;
+padding: 32px;
+}
+
+#winMessage.show { display:flex; }
+
+.win-card {
+background: var(--surface);
+border: 1px solid var(--card-border);
+border-radius: 20px;
+padding: 48px 56px;
+max-width: 360px;
+width: 100%;
+animation: winPop 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+@keyframes winPop {
+from { transform: scale(0.6); opacity:0; }
+to { transform: scale(1); opacity:1; }
+}
+
+.win-emoji { font-size:64px;margin-bottom:12px;display:block; }
+
+.win-title {
+font-size:32px;
+font-weight:800;
+background: linear-gradient(135deg,#fff,var(--match));
+-webkit-background-clip:text;
+-webkit-text-fill-color:transparent;
+background-clip:text;
+margin-bottom:8px;
+}
+
+.win-stats {
+font-family:'Space Mono', monospace;
+font-size:13px;
+color:var(--muted);
+margin-bottom:24px;
+line-height:1.8;
+}
+
+.win-stats span { color:var(--text);font-weight:700; }
+
+@media (max-width:420px) {
+.card { width:64px;height:64px; }
+.card-front-face { font-size:26px; }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<header>
+<h1 class="game-title">Memory Match</h1>
+<p class="subtitle">Flip &amp; Find the Pairs</p>
+</header>
+
+<div class="stats-bar">
+<div class="stat-pill">
+<span class="stat-label">Moves</span>
+<span class="stat-value" id="moves">0</span>
+</div>
+
+<div class="stat-pill">
+<span class="stat-label">Time</span>
+<span class="stat-value" id="timer">0s</span>
+</div>
+
+<div class="stat-pill">
+<span class="stat-label">Pairs</span>
+<span class="stat-value">
+<span id="pairsFound">0</span>/8
+</span>
+</div>
+</div>
+
+<div class="progress-wrap">
+<div id="progressBar"></div>
+</div>
+
+<div id="gameBoard"></div>
+
+<div class="btn-row">
+<button class="btn" id="newGameBtn">New Game</button>
+</div>
+
+</div>
+
+<div id="winMessage">
+<div class="win-card">
+<span class="win-emoji">🎉</span>
+<div class="win-title">You Win!</div>
+<div class="win-stats" id="winStats"></div>
+<button class="btn" id="playAgainBtn" style="width:100%">Play Again</button>
+</div>
+</div>
+
+<script>
+$(function(){
+
+var audioCtx=null;
+
+function getAudioContext(){
+if(!audioCtx){
+audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+}
+return audioCtx;
+}
+
+function playTone(freq,type,duration,volume){
+volume=volume||0.3;
+try{
+var ac=getAudioContext();
+var osc=ac.createOscillator();
+var gain=ac.createGain();
+
+osc.connect(gain);
+gain.connect(ac.destination);
+
+osc.type=type;
+osc.frequency.setValueAtTime(freq,ac.currentTime);
+
+gain.gain.setValueAtTime(volume,ac.currentTime);
+gain.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+duration);
+
+osc.start();
+osc.stop(ac.currentTime+duration);
+}catch(err){}
+}
+
+function playMatchSound(){
+playTone(523,'sine',0.15,0.4);
+setTimeout(function(){playTone(659,'sine',0.15,0.4);},100);
+setTimeout(function(){playTone(784,'sine',0.30,0.4);},200);
+}
+
+function playWrongSound(){
+playTone(200,'sawtooth',0.2,0.2);
+setTimeout(function(){playTone(150,'sawtooth',0.25,0.2);},150);
+}
+
+function playWinSound(){
+var notes=[523,659,784,1047];
+notes.forEach(function(freq,i){
+setTimeout(function(){playTone(freq,'sine',0.4,0.5);},i*120);
+});
+}
+
+var ALL_EMOJIS=['🐶','🦊','🐸','🦁','🐝','🌙','⚡','🎸'];
+
+var TOTAL_PAIRS=8;
+var flippedCards=[];
+var matchedCount=0;
+var moves=0;
+var seconds=0;
+var timerInterval=null;
+var timerStarted=false;
+var locked=false;
+
+function buildBoard(){
+
+clearInterval(timerInterval);
+
+seconds=0;
+moves=0;
+matchedCount=0;
+flippedCards=[];
+locked=false;
+timerStarted=false;
+
+$('#moves').text(0);
+$('#timer').text('0s');
+$('#pairsFound').text(0);
+$('#progressBar').css('width','0%');
+
+var cardData=ALL_EMOJIS.concat(ALL_EMOJIS).sort(function(){return Math.random()-0.5;});
+
+$('#gameBoard').empty();
+
+cardData.forEach(function(emoji,index){
+var $card=$(
+'<div class="card" data-index="'+index+'" data-emoji="'+emoji+'">'+
+'<div class="card-inner">'+
+'<div class="card-face card-back-face"></div>'+
+'<div class="card-face card-front-face">'+emoji+'</div>'+
+'</div>'+
+'</div>'
+);
+$('#gameBoard').append($card);
+});
+}
+
+function startTimer(){
+if(timerStarted)return;
+timerStarted=true;
+
+timerInterval=setInterval(function(){
+seconds++;
+$('#timer').text(seconds+'s');
+},1000);
+}
+
+$(document).on('click','.card',function(){
+var $card=$(this);
+
+if(locked||$card.hasClass('flipped')||$card.hasClass('matched')){
+return;
+}
+
+startTimer();
+
+$card.addClass('flipped');
+flippedCards.push($card);
+
+if(flippedCards.length===2){
+
+locked=true;
+moves++;
+$('#moves').text(moves);
+
+var $first=flippedCards[0];
+var $second=flippedCards[1];
+
+if($first.data('emoji')===$second.data('emoji')){
+
+playMatchSound();
+
+setTimeout(function(){
+
+$first.add($second).addClass('matched').removeClass('flipped');
+
+matchedCount++;
+
+$('#pairsFound').text(matchedCount);
+
+var progress=(matchedCount/TOTAL_PAIRS)*100;
+$('#progressBar').css('width',progress+'%');
+
+flippedCards=[];
+locked=false;
+
+if(matchedCount===TOTAL_PAIRS){
+onWin();
+}
+
+},350);
+
+}else{
+
+playWrongSound();
+
+$first.add($second).addClass('wrong');
+
+setTimeout(function(){
+$first.add($second).removeClass('flipped wrong');
+flippedCards=[];
+locked=false;
+},900);
+}
+}
+});
+
+function onWin(){
+
+clearInterval(timerInterval);
+playWinSound();
+
+$('#winStats').html(
+'Moves: <span>'+moves+'</span><br>'+
+'Time: <span>'+seconds+'s</span>'
+);
+
+setTimeout(function(){
+$('#winMessage').addClass('show');
+},400);
+}
+
+$('#newGameBtn,#playAgainBtn').on('click',function(){
+$('#winMessage').removeClass('show');
+buildBoard();
+});
+
+buildBoard();
+
+});
+</script>
+
+</body>
+</html>
